@@ -1,11 +1,14 @@
 import express, { Request, Response } from 'express'
 import { config } from './config.js'
+import oauthRouter from './routes/oauth.js'
 
 const app = express()
 
-app.get('/', (request: Request, response: Response) => {
-  response.status(200).send('Hello World')
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).send('Index')
 })
+
+app.use('/oauth', oauthRouter)
 
 app
   .listen(config.port, () => {

@@ -1,19 +1,41 @@
-import { login } from '../oauth/client'
+import { useEffect, useState } from 'react'
+
+const API_URL = import.meta.env.API_URL || 'http://localhost:3001'
 
 export const HomePage = () => {
+  const [email, setEmail] = useState('')
+  useEffect(() => {
+    const fetchEmail = async () => {
+      const emailResponse = await fetch(`${API_URL}/oauth/email`, {
+        credentials: 'include',
+      })
+      if (!emailResponse.ok) {
+        return
+      }
+
+      const responseObject = await emailResponse.json()
+      if ('email' in responseObject) {
+        setEmail(responseObject.email)
+      }
+    }
+    fetchEmail()
+  })
   return (
     <>
       {' '}
-      <h1>Vite + React</h1>
+      <h1>OAuth 2.0 client demo</h1>
       <div className="card">
-        <button onClick={() => login()}>Login</button>
+        <button
+          onClick={() => (window.location.href = `${API_URL}/oauth/login`)}
+        >
+          Login
+        </button>
         <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
+          {email === ''
+            ? 'User not logged in'
+            : `User logged in with email: ${email}`}
         </p>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }
