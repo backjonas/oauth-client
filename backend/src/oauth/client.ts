@@ -20,7 +20,7 @@ export interface IntrospectionResponse {
   access_type: string
 }
 
-export const getAuthServer = async () => {
+export const getAuthServer = async (state: string) => {
   const endpoint = await getEndpoint('authorization_endpoint')
   if (endpoint === undefined) {
     return undefined
@@ -29,7 +29,6 @@ export const getAuthServer = async () => {
   const clientId = config.oauthClientId
   const scope = 'openid%20email'
   const redirectUri = config.redirectUri
-  const state = 'placeholder_state'
   const nonce = '0394852-3190485-2490358'
 
   return (
