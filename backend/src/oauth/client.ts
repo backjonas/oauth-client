@@ -43,7 +43,9 @@ export const getAuthServer = async () => {
   )
 }
 
-export const getToken = async (code: string): Promise<string | undefined> => {
+export const getToken = async (
+  code: string
+): Promise<TokenResponse | undefined> => {
   const endpoint = await getEndpoint('token_endpoint')
   if (endpoint === undefined) {
     return undefined
@@ -71,8 +73,7 @@ export const getToken = async (code: string): Promise<string | undefined> => {
       console.error(authResponse)
       return undefined
     }
-    const responseObject = (await authResponse.json()) as TokenResponse
-    return responseObject.access_token
+    return (await authResponse.json()) as TokenResponse
   } catch (error) {
     console.error(error)
     return undefined
