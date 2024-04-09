@@ -1,9 +1,11 @@
 import express, { Request, Response } from 'express'
+import cookieParser from 'cookie-parser'
 import { config } from './config.js'
 import oauthRouter from './routes/oauth.js'
 
 const app = express()
 
+app.use(cookieParser(config.cookieSecret))
 app.get('/', (req: Request, res: Response) => {
   res.status(200).send('Index')
 })

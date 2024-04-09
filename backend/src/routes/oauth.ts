@@ -1,12 +1,15 @@
 import express, { Request, Response } from 'express'
 import { getAuthServer, getToken, introspectToken } from '../oauth/client.js'
-import { getAccessTokenCookie } from '../utils.js'
 import { config } from '../config.js'
 
 const oauthRouter = express.Router()
 
 oauthRouter.get('/login', async (_req: Request, res: Response) => {
-  res.redirect(getAuthServer())
+  const authServer = await getAuthServer()
+  if (authServer === undefined) {
+    return res.sendStatus(500)
+  }
+  res.redirect(authServer)
 })
 
 oauthRouter.get('/code', async (req: Request, res: Response) => {
@@ -30,12 +33,17 @@ oauthRouter.get('/email', async (req: Request, res: Response) => {
   res.header('Access-Control-Allow-Origin', config.frontendOrigin)
   res.header('Access-Control-Allow-Credentials', 'true')
 
-  const accessToken = getAccessTokenCookie(req)
+  const accessToken = req.cookies['access_token']
   if (!(typeof accessToken === 'string')) {
     return res.sendStatus(400)
   }
 
   const introspectionResponse = await introspectToken(accessToken)
+  if (introspectionResponse === undefined) {
+    res.clearCookie('access_token')
+    return res.sendStatus(401)
+  }
+
   const email = introspectionResponse.email
   return res.status(200).json({ email })
 })

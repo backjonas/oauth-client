@@ -20,7 +20,12 @@ export interface IntrospectionResponse {
   access_type: string
 }
 
-export const getAuthServer = () => {
+export const getAuthServer = async () => {
+  const endpoint = await getEndpoint('authorization_endpoint')
+  if (endpoint === undefined) {
+    return undefined
+  }
+
   const clientId = config.oauthClientId
   const scope = 'openid%20email'
   const redirectUri = config.redirectUri
@@ -28,7 +33,7 @@ export const getAuthServer = () => {
   const nonce = '0394852-3190485-2490358'
 
   return (
-    `${config.authServer}/auth` +
+    endpoint +
     '?response_type=code' +
     `&client_id=${clientId}` +
     `&scope=${scope}` +
@@ -39,13 +44,17 @@ export const getAuthServer = () => {
 }
 
 export const getToken = async (code: string): Promise<string | undefined> => {
+  const endpoint = await getEndpoint('token_endpoint')
+  if (endpoint === undefined) {
+    return undefined
+  }
   const client_id = config.oauthClientId
   const client_secret = config.oauthClientSecret
   const redirect_uri = config.redirectUri
   const grant_type = 'authorization_code'
 
   try {
-    const authResponse = await fetch(`${config.authServer}/token`, {
+    const authResponse = await fetch(endpoint, {
       method: 'POST',
       body: new URLSearchParams({
         client_id,
@@ -59,7 +68,7 @@ export const getToken = async (code: string): Promise<string | undefined> => {
       },
     })
     if (!authResponse.ok) {
-      console.error(await authResponse.json())
+      console.error(authResponse)
       return undefined
     }
     const responseObject = (await authResponse.json()) as TokenResponse
@@ -72,9 +81,27 @@ export const getToken = async (code: string): Promise<string | undefined> => {
 
 export const introspectToken = async (
   token: string
-): Promise<IntrospectionResponse> => {
-  const authResponse = await fetch(
-    `${config.introspectionServer}/tokeninfo?access_token=${token}`
-  )
+): Promise<IntrospectionResponse | undefined> => {
+  const endpoint = await getEndpoint('userinfo_endpoint')
+  if (endpoint === undefined) {
+    return undefined
+  }
+
+  const authResponse = await fetch(`${endpoint}?access_token=${token}`)
+  if (!authResponse.ok) {
+    return undefined
+  }
+
   return (await authResponse.json()) as IntrospectionResponse
+}
+
+const getEndpoint = async (endpoint: string): Promise<string | undefined> => {
+  const endpointResponse = await fetch(config.oidConfigEndpoint)
+  if (!endpointResponse.ok) {
+    return undefined
+  }
+  const endpointObject = (await endpointResponse.json()) as {
+    [key: string]: string
+  }
+  return endpointObject[endpoint]
 }
