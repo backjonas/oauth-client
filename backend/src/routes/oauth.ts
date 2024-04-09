@@ -1,14 +1,23 @@
 import express, { Request, Response } from 'express'
 import { randomBytes } from 'crypto'
+import base64url from 'base64url'
 
-import { getAuthServer, getToken, introspectToken } from '../oauth/client.js'
+import {
+  generateCodeChallenge,
+  getAuthServer,
+  getToken,
+  introspectToken,
+} from '../oauth/client.js'
 import { config } from '../config.js'
 
 const oauthRouter = express.Router()
 
 oauthRouter.get('/login', async (_req: Request, res: Response) => {
   const state = randomBytes(20).toString('hex')
-  const authServer = await getAuthServer(state)
+  const codeVerifier = base64url(randomBytes(32))
+  const codeChallenge = generateCodeChallenge(codeVerifier)
+
+  const authServer = await getAuthServer(state, codeChallenge)
   if (authServer === undefined) {
     return res.sendStatus(500)
   }
@@ -17,7 +26,15 @@ oauthRouter.get('/login', async (_req: Request, res: Response) => {
     secure: true,
     sameSite: 'lax',
     signed: true,
-    maxAge: 60*1000,
+    maxAge: 60 * 1000,
+  })
+
+  res.cookie('code_verifier', codeVerifier, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    signed: true,
+    maxAge: 60 * 1000,
   })
 
   res.redirect(authServer)
@@ -25,7 +42,8 @@ oauthRouter.get('/login', async (_req: Request, res: Response) => {
 
 oauthRouter.get('/code', async (req: Request, res: Response) => {
   const code = req.query?.code
-  if (typeof code !== 'string') {
+  const codeVerifier = req.signedCookies?.code_verifier
+  if (typeof code !== 'string' || typeof codeVerifier !== 'string') {
     return res.sendStatus(400)
   }
 
@@ -40,7 +58,7 @@ oauthRouter.get('/code', async (req: Request, res: Response) => {
     // TODO: Revoke code
     return res.sendStatus(403)
   }
-  const token = await getToken(code)
+  const token = await getToken(code, codeVerifier)
   if (token !== undefined) {
     res.cookie('access_token', token.access_token, {
       httpOnly: true,

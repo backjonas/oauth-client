@@ -1,4 +1,6 @@
 import { config } from '../config.js'
+import crypto from 'crypto'
+import base64url from 'base64url'
 
 export interface TokenResponse {
   access_token: string
@@ -20,7 +22,7 @@ export interface IntrospectionResponse {
   access_type: string
 }
 
-export const getAuthServer = async (state: string) => {
+export const getAuthServer = async (state: string, codeChallenge: string) => {
   const endpoint = await getEndpoint('authorization_endpoint')
   if (endpoint === undefined) {
     return undefined
@@ -29,7 +31,6 @@ export const getAuthServer = async (state: string) => {
   const clientId = config.oauthClientId
   const scope = 'openid%20email'
   const redirectUri = config.redirectUri
-  const nonce = '0394852-3190485-2490358'
 
   return (
     endpoint +
@@ -38,12 +39,14 @@ export const getAuthServer = async (state: string) => {
     `&scope=${scope}` +
     `&redirect_uri=${redirectUri}` +
     `&state=${state}` +
-    `&nonce=${nonce}`
+    `&code_challenge=${codeChallenge}` +
+    '&code_challenge_method=S256'
   )
 }
 
 export const getToken = async (
-  code: string
+  code: string,
+  codeVerifier: string
 ): Promise<TokenResponse | undefined> => {
   const endpoint = await getEndpoint('token_endpoint')
   if (endpoint === undefined) {
@@ -53,6 +56,7 @@ export const getToken = async (
   const client_secret = config.oauthClientSecret
   const redirect_uri = config.redirectUri
   const grant_type = 'authorization_code'
+  const code_verifier = codeVerifier
 
   try {
     const authResponse = await fetch(endpoint, {
@@ -63,13 +67,13 @@ export const getToken = async (
         redirect_uri,
         grant_type,
         code,
+        code_verifier,
       }),
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     })
     if (!authResponse.ok) {
-      console.error(authResponse)
       return undefined
     }
     return (await authResponse.json()) as TokenResponse
@@ -104,4 +108,8 @@ const getEndpoint = async (endpoint: string): Promise<string | undefined> => {
     [key: string]: string
   }
   return endpointObject[endpoint]
+}
+
+export const generateCodeChallenge = (codeVerifier: string) => {
+  return base64url(crypto.createHash('sha256').update(codeVerifier).digest())
 }
