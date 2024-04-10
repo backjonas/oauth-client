@@ -6,9 +6,6 @@ import oauthRouter from './routes/oauth.js'
 const app = express()
 
 app.use(cookieParser(config.cookieSecret))
-app.get('/', (req: Request, res: Response) => {
-  res.status(200).send('Index')
-})
 
 app.use('/oauth', oauthRouter)
 

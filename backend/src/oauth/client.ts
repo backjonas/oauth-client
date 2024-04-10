@@ -28,16 +28,12 @@ export const getAuthServer = async (state: string, codeChallenge: string) => {
     return undefined
   }
 
-  const clientId = config.oauthClientId
-  const scope = 'openid%20email'
-  const redirectUri = config.redirectUri
-
   return (
     endpoint +
     '?response_type=code' +
-    `&client_id=${clientId}` +
-    `&scope=${scope}` +
-    `&redirect_uri=${redirectUri}` +
+    `&client_id=${config.oauthClientId}` +
+    '&scope=openid%20email' +
+    `&redirect_uri=${config.redirectUri}` +
     `&state=${state}` +
     `&code_challenge=${codeChallenge}` +
     '&code_challenge_method=S256'
