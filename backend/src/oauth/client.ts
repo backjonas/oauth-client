@@ -79,6 +79,29 @@ export const getToken = async (
   }
 }
 
+export const revokeToken = async (token: string): Promise<boolean> => {
+  const endpoint = await getEndpoint('revocation_endpoint')
+  if (endpoint === undefined) {
+    return false
+  }
+
+  try {
+    const revocationResponse = await fetch(endpoint, {
+      method: 'POST',
+      body: new URLSearchParams({
+        token,
+      }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+    return revocationResponse.ok
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
 export const introspectToken = async (
   token: string
 ): Promise<IntrospectionResponse | undefined> => {

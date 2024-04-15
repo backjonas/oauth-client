@@ -7,6 +7,7 @@ import {
   getAuthServer,
   getToken,
   introspectToken,
+  revokeToken,
 } from '../oauth/client.js'
 import { config } from '../config.js'
 
@@ -55,7 +56,6 @@ oauthRouter.get('/code', async (req: Request, res: Response) => {
     codeState === '' ||
     codeState !== cookieState
   ) {
-    // TODO: Revoke code
     return res.sendStatus(403)
   }
   const token = await getToken(code, codeVerifier)
@@ -71,12 +71,27 @@ oauthRouter.get('/code', async (req: Request, res: Response) => {
   res.redirect(config.frontendOrigin)
 })
 
+oauthRouter.get('/logout', async (req: Request, res: Response) => {
+  const accessToken = req.signedCookies['access_token']
+  if (!(typeof accessToken === 'string')) {
+    return res.sendStatus(400)
+  }
+
+  const revocationResponse = await revokeToken(accessToken)
+  if (!revocationResponse) {
+    return res.sendStatus(500)
+  }
+
+  res.clearCookie('access_token')
+  res.redirect(config.frontendOrigin)
+})
+
 oauthRouter.get('/email', async (req: Request, res: Response) => {
   res.header('Access-Control-Allow-Origin', config.frontendOrigin)
   res.header('Access-Control-Allow-Credentials', 'true')
 
   const accessToken = req.signedCookies['access_token']
-  if (!(typeof accessToken === 'string')) {
+  if (typeof accessToken !== 'string') {
     return res.sendStatus(400)
   }
 
