@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 
 const API_URL = import.meta.env.API_URL || 'http://localhost:3001'
 
-const Authorized = ({ email }: { email: string }) => {
+const Authorized = ({ sub }: { sub: string }) => {
   return (
     <div className="card">
       <button
@@ -11,7 +11,7 @@ const Authorized = ({ email }: { email: string }) => {
       >
         Logout
       </button>
-      <p>{`User logged in with email: ${email}`}</p>
+      <p>{`User logged in, identified by sub: ${sub}`}</p>
     </div>
   )
 }
@@ -28,27 +28,27 @@ const Unauthorized = () => {
 }
 
 const App = () => {
-  const [email, setEmail] = useState('')
+  const [sub, setSub] = useState('')
   useEffect(() => {
-    const fetchEmail = async () => {
-      const emailResponse = await fetch(`${API_URL}/oauth/email`, {
+    const fetchSub = async () => {
+      const subResponse = await fetch(`${API_URL}/oauth/sub`, {
         credentials: 'include',
       })
-      if (!emailResponse.ok) {
+      if (!subResponse.ok) {
         return
       }
 
-      const responseObject = await emailResponse.json()
-      if ('email' in responseObject) {
-        setEmail(responseObject.email)
+      const responseObject = await subResponse.json()
+      if ('sub' in responseObject) {
+        setSub(responseObject.sub)
       }
     }
-    fetchEmail()
+    fetchSub()
   }, [])
   return (
     <>
       <h1>OAuth 2.0 client demo</h1>
-      {email === '' ? <Unauthorized /> : <Authorized email={email} />}
+      {sub === '' ? <Unauthorized /> : <Authorized sub={sub} />}
     </>
   )
 }

@@ -45,7 +45,7 @@ export const getAuthServer = async (state: string, codeChallenge: string) => {
     endpoint +
     '?response_type=code' +
     `&client_id=${config.oauthClientId}` +
-    '&scope=email' +
+    '&scope=openid' +
     `&redirect_uri=${config.redirectUri}` +
     '&access_type=offline' +
     `&state=${state}` +

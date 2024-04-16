@@ -96,7 +96,7 @@ oauthRouter.get('/logout', async (req: Request, res: Response) => {
   res.redirect(config.frontendOrigin)
 })
 
-oauthRouter.get('/email', async (req: Request, res: Response) => {
+oauthRouter.get('/sub', async (req: Request, res: Response) => {
   res.header('Access-Control-Allow-Origin', config.frontendOrigin)
   res.header('Access-Control-Allow-Credentials', 'true')
 
@@ -109,8 +109,8 @@ oauthRouter.get('/email', async (req: Request, res: Response) => {
   // Call userinfo endpoint to get information about the token
   const introspectionResponse = await introspectToken(accessToken)
   if (introspectionResponse !== undefined) {
-    const email = introspectionResponse.email
-    return res.status(200).json({ email })
+    const sub = introspectionResponse.sub
+    return res.status(200).json({ sub })
   }
 
   // Introspection failed due to an expired or otherwise invalid access token
@@ -144,8 +144,8 @@ oauthRouter.get('/email', async (req: Request, res: Response) => {
   ) as IdTokenInformation
 
   if (decodedIdToken !== undefined) {
-    const email = decodedIdToken.email
-    return res.status(200).json({ email })
+    const sub = decodedIdToken.sub
+    return res.status(200).json({ sub })
   }
 
   return res.sendStatus(401)
