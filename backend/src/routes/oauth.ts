@@ -3,10 +3,12 @@ import { randomBytes } from 'crypto'
 import base64url from 'base64url'
 
 import {
+  IdTokenInformation,
   generateCodeChallenge,
   getAuthServer,
   getToken,
   introspectToken,
+  refreshToken,
   revokeToken,
 } from '../oauth/client.js'
 import { config } from '../config.js'
@@ -67,7 +69,15 @@ oauthRouter.get('/code', async (req: Request, res: Response) => {
       signed: true,
       maxAge: token.expires_in * 1000,
     })
+
+    res.cookie('refresh_token', token.refresh_token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      signed: true,
+    })
   }
+
   res.redirect(config.frontendOrigin)
 })
 
@@ -90,19 +100,55 @@ oauthRouter.get('/email', async (req: Request, res: Response) => {
   res.header('Access-Control-Allow-Origin', config.frontendOrigin)
   res.header('Access-Control-Allow-Credentials', 'true')
 
+  // No access_token provided, ignore request
   const accessToken = req.signedCookies['access_token']
   if (typeof accessToken !== 'string') {
-    return res.sendStatus(400)
+    return res.sendStatus(200)
   }
 
+  // Call userinfo endpoint to get information about the token
   const introspectionResponse = await introspectToken(accessToken)
-  if (introspectionResponse === undefined) {
+  if (introspectionResponse !== undefined) {
+    const email = introspectionResponse.email
+    return res.status(200).json({ email })
+  }
+
+  // Introspection failed due to an expired or otherwise invalid access token
+  // Attempt to refresh the access token if a refresh token exists
+  const refresh_token = req.signedCookies['refresh_token']
+  if (typeof refresh_token !== 'string') {
     res.clearCookie('access_token')
     return res.sendStatus(401)
   }
 
-  const email = introspectionResponse.email
-  return res.status(200).json({ email })
+  const tokenRefreshResponse = await refreshToken(refresh_token)
+  if (tokenRefreshResponse === undefined) {
+    res.clearCookie('access_token')
+    res.clearCookie('refresh_token')
+    return res.sendStatus(401)
+  }
+
+  res.cookie('access_token', tokenRefreshResponse.access_token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    signed: true,
+    maxAge: tokenRefreshResponse.expires_in * 1000,
+  })
+
+  const decodedIdToken = JSON.parse(
+    Buffer.from(
+      tokenRefreshResponse.id_token.split('.')[1],
+      'base64'
+    ).toString()
+  ) as IdTokenInformation
+
+  if (decodedIdToken !== undefined) {
+    const email = decodedIdToken.email
+    return res.status(200).json({ email })
+  }
+
+  return res.sendStatus(401)
 })
 
 export default oauthRouter

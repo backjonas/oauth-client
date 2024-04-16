@@ -8,6 +8,7 @@ export interface TokenResponse {
   scope: string
   token_type: string
   id_token: string
+  refresh_token: string
 }
 
 export interface IntrospectionResponse {
@@ -22,6 +23,18 @@ export interface IntrospectionResponse {
   access_type: string
 }
 
+export interface IdTokenInformation {
+  iss: string
+  azp: string
+  aud: string
+  sub: string
+  email: string
+  email_verified: boolean
+  at_hash: string
+  iat: number
+  exp: number
+}
+
 export const getAuthServer = async (state: string, codeChallenge: string) => {
   const endpoint = await getEndpoint('authorization_endpoint')
   if (endpoint === undefined) {
@@ -32,8 +45,9 @@ export const getAuthServer = async (state: string, codeChallenge: string) => {
     endpoint +
     '?response_type=code' +
     `&client_id=${config.oauthClientId}` +
-    '&scope=openid%20email' +
+    '&scope=email' +
     `&redirect_uri=${config.redirectUri}` +
+    '&access_type=offline' +
     `&state=${state}` +
     `&code_challenge=${codeChallenge}` +
     '&code_challenge_method=S256'
@@ -70,6 +84,42 @@ export const getToken = async (
       },
     })
     if (!authResponse.ok) {
+      return undefined
+    }
+    return (await authResponse.json()) as TokenResponse
+  } catch (error) {
+    console.error(error)
+    return undefined
+  }
+}
+
+export const refreshToken = async (
+  refresh_token: string
+): Promise<TokenResponse | undefined> => {
+  const endpoint = await getEndpoint('token_endpoint')
+  if (endpoint === undefined) {
+    return undefined
+  }
+
+  const client_id = config.oauthClientId
+  const client_secret = config.oauthClientSecret
+  const grant_type = 'refresh_token'
+
+  try {
+    const authResponse = await fetch(endpoint, {
+      method: 'POST',
+      body: new URLSearchParams({
+        client_id,
+        client_secret,
+        refresh_token,
+        grant_type,
+      }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+    if (!authResponse.ok) {
+      console.error(authResponse)
       return undefined
     }
     return (await authResponse.json()) as TokenResponse
