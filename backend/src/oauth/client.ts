@@ -160,7 +160,12 @@ export const introspectToken = async (
     return undefined
   }
 
-  const authResponse = await fetch(`${endpoint}?access_token=${token}`)
+  const authResponse = await fetch(endpoint, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
   if (!authResponse.ok) {
     return undefined
   }
