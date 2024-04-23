@@ -35,18 +35,23 @@ export interface IdTokenInformation {
   exp: number
 }
 
-export const getAuthServer = async (state: string, codeChallenge: string) => {
-  const endpoint = await getEndpoint('authorization_endpoint')
-  if (endpoint === undefined) {
+export const getAuthServer = async (
+  state: string,
+  codeChallenge: string,
+  provider: string
+) => {
+  const endpoint = await getEndpoint('authorization_endpoint', provider)
+  const oauthCredentials = getProviderCredentials(provider)
+  if (endpoint === undefined || oauthCredentials === undefined) {
     return undefined
   }
 
   return (
     endpoint +
     '?response_type=code' +
-    `&client_id=${config.oauthClientId}` +
+    `&client_id=${oauthCredentials.clientId}` +
     '&scope=openid' +
-    `&redirect_uri=${config.redirectUri}` +
+    `&redirect_uri=${config.redirectUri}/${provider}` +
     '&access_type=offline' +
     `&state=${state}` +
     `&code_challenge=${codeChallenge}` +
@@ -56,15 +61,18 @@ export const getAuthServer = async (state: string, codeChallenge: string) => {
 
 export const getToken = async (
   code: string,
-  codeVerifier: string
+  codeVerifier: string,
+  provider: string
 ): Promise<TokenResponse | undefined> => {
-  const endpoint = await getEndpoint('token_endpoint')
-  if (endpoint === undefined) {
+  const endpoint = await getEndpoint('token_endpoint', provider)
+  const configCredentials = getProviderCredentials(provider)
+  if (endpoint === undefined || configCredentials === undefined) {
     return undefined
   }
-  const client_id = config.oauthClientId
-  const client_secret = config.oauthClientSecret
-  const redirect_uri = config.redirectUri
+
+  const client_id = configCredentials.clientId
+  const client_secret = configCredentials.clientSecret
+  const redirect_uri = `${config.redirectUri}/${provider}`
   const grant_type = 'authorization_code'
   const code_verifier = codeVerifier
 
@@ -94,15 +102,17 @@ export const getToken = async (
 }
 
 export const refreshToken = async (
-  refresh_token: string
+  refresh_token: string,
+  provider: string
 ): Promise<TokenResponse | undefined> => {
-  const endpoint = await getEndpoint('token_endpoint')
-  if (endpoint === undefined) {
+  const endpoint = await getEndpoint('token_endpoint', provider)
+  const oauthCredentials = getProviderCredentials(provider)
+  if (endpoint === undefined || oauthCredentials === undefined) {
     return undefined
   }
 
-  const client_id = config.oauthClientId
-  const client_secret = config.oauthClientSecret
+  const client_id = oauthCredentials.clientId
+  const client_secret = oauthCredentials.clientSecret
   const grant_type = 'refresh_token'
 
   try {
@@ -129,9 +139,15 @@ export const refreshToken = async (
   }
 }
 
-export const revokeToken = async (token: string): Promise<boolean> => {
-  const endpoint = await getEndpoint('revocation_endpoint')
+export const revokeToken = async (
+  token: string,
+  provider: string
+): Promise<boolean> => {
+  const endpoint =
+    (await getEndpoint('revocation_endpoint', provider)) ??
+    (await getEndpoint('end_session_endpoint', provider))
   if (endpoint === undefined) {
+    console.log('endpoint')
     return false
   }
 
@@ -153,9 +169,10 @@ export const revokeToken = async (token: string): Promise<boolean> => {
 }
 
 export const introspectToken = async (
-  token: string
+  token: string,
+  provider: string
 ): Promise<IntrospectionResponse | undefined> => {
-  const endpoint = await getEndpoint('userinfo_endpoint')
+  const endpoint = await getEndpoint('userinfo_endpoint', provider)
   if (endpoint === undefined) {
     return undefined
   }
@@ -173,17 +190,39 @@ export const introspectToken = async (
   return (await authResponse.json()) as IntrospectionResponse
 }
 
-const getEndpoint = async (endpoint: string): Promise<string | undefined> => {
-  const endpointResponse = await fetch(config.oidConfigEndpoint)
+const getEndpoint = async (
+  endpoint: string,
+  provider: string
+): Promise<string | undefined> => {
+  const oauthCredentials = getProviderCredentials(provider)
+  if (!oauthCredentials) {
+    return undefined
+  }
+
+  const endpointResponse = await fetch(oauthCredentials.configEndpoint)
   if (!endpointResponse.ok) {
+    console.log(await endpointResponse.json())
     return undefined
   }
   const endpointObject = (await endpointResponse.json()) as {
     [key: string]: string
   }
+  console.log(endpointObject)
   return endpointObject[endpoint]
 }
 
 export const generateCodeChallenge = (codeVerifier: string) => {
   return base64url(crypto.createHash('sha256').update(codeVerifier).digest())
+}
+
+const getProviderCredentials = (provider: string) => {
+  if (provider === 'google') {
+    return config.google
+  }
+
+  if (provider === 'microsoft') {
+    return config.microsoft
+  }
+
+  return undefined
 }

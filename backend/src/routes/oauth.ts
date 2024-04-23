@@ -15,12 +15,13 @@ import { config } from '../config.js'
 
 const oauthRouter = express.Router()
 
-oauthRouter.get('/login', async (_req: Request, res: Response) => {
+oauthRouter.get('/login/:provider', async (req: Request, res: Response) => {
+  const { provider } = req.params
   const state = randomBytes(20).toString('hex')
   const codeVerifier = base64url(randomBytes(32))
   const codeChallenge = generateCodeChallenge(codeVerifier)
 
-  const authServer = await getAuthServer(state, codeChallenge)
+  const authServer = await getAuthServer(state, codeChallenge, provider)
   if (authServer === undefined) {
     return res.sendStatus(500)
   }
@@ -40,16 +41,27 @@ oauthRouter.get('/login', async (_req: Request, res: Response) => {
     maxAge: 60 * 1000,
   })
 
+  res.cookie('provider', provider, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    signed: true,
+  })
+
   res.redirect(authServer)
 })
 
-oauthRouter.get('/code', async (req: Request, res: Response) => {
+oauthRouter.get('/code/:provider', async (req: Request, res: Response) => {
+  // Verify that a authorization code was provided
+  // and that a code verifier has been stored in the client cookies
   const code = req.query?.code
   const codeVerifier = req.signedCookies?.code_verifier
   if (typeof code !== 'string' || typeof codeVerifier !== 'string') {
     return res.sendStatus(400)
   }
 
+  // Verify that the state sent in the original authorization request matches
+  // with the state provided in the callback
   const codeState = req.query?.state
   const cookieState = req.signedCookies['state'] as string | undefined
   if (
@@ -60,7 +72,20 @@ oauthRouter.get('/code', async (req: Request, res: Response) => {
   ) {
     return res.sendStatus(403)
   }
-  const token = await getToken(code, codeVerifier)
+
+  // Verify that the provider of the oauth callback matches with the
+  // provider of the original login request
+  const previousProvider = req.signedCookies?.provider
+  const provider = req.params.provider
+  if (
+    typeof previousProvider !== 'string' ||
+    typeof provider !== 'string' ||
+    provider !== previousProvider
+  ) {
+    return res.sendStatus(403)
+  }
+
+  const token = await getToken(code, codeVerifier, provider)
   if (token !== undefined) {
     res.cookie('access_token', token.access_token, {
       httpOnly: true,
@@ -83,16 +108,20 @@ oauthRouter.get('/code', async (req: Request, res: Response) => {
 
 oauthRouter.get('/logout', async (req: Request, res: Response) => {
   const accessToken = req.signedCookies['access_token']
-  if (!(typeof accessToken === 'string')) {
+  const provider = req.signedCookies?.provider
+  if (typeof accessToken !== 'string' || typeof provider !== 'string') {
     return res.sendStatus(400)
   }
 
-  const revocationResponse = await revokeToken(accessToken)
+  const revocationResponse = await revokeToken(accessToken, provider)
   if (!revocationResponse) {
     return res.sendStatus(500)
   }
 
   res.clearCookie('access_token')
+  res.clearCookie('refresh_token')
+  res.clearCookie('provider')
+
   res.redirect(config.frontendOrigin)
 })
 
@@ -100,17 +129,18 @@ oauthRouter.get('/sub', async (req: Request, res: Response) => {
   res.header('Access-Control-Allow-Origin', config.frontendOrigin)
   res.header('Access-Control-Allow-Credentials', 'true')
 
-  // No access_token provided, ignore request
+  // Access token or provider not provided, ignore request
   const accessToken = req.signedCookies['access_token']
-  if (typeof accessToken !== 'string') {
+  const provider = req.signedCookies?.provider
+  if (typeof accessToken !== 'string' || typeof provider !== 'string') {
     return res.sendStatus(200)
   }
 
   // Call userinfo endpoint to get information about the token
-  const introspectionResponse = await introspectToken(accessToken)
+  const introspectionResponse = await introspectToken(accessToken, provider)
   if (introspectionResponse !== undefined) {
     const sub = introspectionResponse.sub
-    return res.status(200).json({ sub })
+    return res.status(200).json({ sub, provider })
   }
 
   // Introspection failed due to an expired or otherwise invalid access token
@@ -121,7 +151,7 @@ oauthRouter.get('/sub', async (req: Request, res: Response) => {
     return res.sendStatus(401)
   }
 
-  const tokenRefreshResponse = await refreshToken(refresh_token)
+  const tokenRefreshResponse = await refreshToken(refresh_token, provider)
   if (tokenRefreshResponse === undefined) {
     res.clearCookie('access_token')
     res.clearCookie('refresh_token')
@@ -145,7 +175,7 @@ oauthRouter.get('/sub', async (req: Request, res: Response) => {
 
   if (decodedIdToken !== undefined) {
     const sub = decodedIdToken.sub
-    return res.status(200).json({ sub })
+    return res.status(200).json({ sub, provider })
   }
 
   return res.sendStatus(401)
