@@ -48,7 +48,6 @@ export const HomePage = () => {
       }
 
       const responseObject = await subResponse.json()
-      console.log(responseObject)
       if ('sub' in responseObject && 'provider' in responseObject) {
         setUser({ sub: responseObject.sub, provider: responseObject.provider })
       }

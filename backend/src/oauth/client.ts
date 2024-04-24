@@ -41,7 +41,7 @@ export const getAuthServer = async (
   provider: string
 ) => {
   const endpoint = await getEndpoint('authorization_endpoint', provider)
-  const oauthCredentials = getProviderCredentials(provider)
+  const oauthCredentials = config.providers[provider]
   if (endpoint === undefined || oauthCredentials === undefined) {
     return undefined
   }
@@ -65,7 +65,7 @@ export const getToken = async (
   provider: string
 ): Promise<TokenResponse | undefined> => {
   const endpoint = await getEndpoint('token_endpoint', provider)
-  const configCredentials = getProviderCredentials(provider)
+  const configCredentials = config.providers[provider]
   if (endpoint === undefined || configCredentials === undefined) {
     return undefined
   }
@@ -106,7 +106,7 @@ export const refreshToken = async (
   provider: string
 ): Promise<TokenResponse | undefined> => {
   const endpoint = await getEndpoint('token_endpoint', provider)
-  const oauthCredentials = getProviderCredentials(provider)
+  const oauthCredentials = config.providers[provider]
   if (endpoint === undefined || oauthCredentials === undefined) {
     return undefined
   }
@@ -147,7 +147,6 @@ export const revokeToken = async (
     (await getEndpoint('revocation_endpoint', provider)) ??
     (await getEndpoint('end_session_endpoint', provider))
   if (endpoint === undefined) {
-    console.log('endpoint')
     return false
   }
 
@@ -194,35 +193,21 @@ const getEndpoint = async (
   endpoint: string,
   provider: string
 ): Promise<string | undefined> => {
-  const oauthCredentials = getProviderCredentials(provider)
+  const oauthCredentials = config.providers[provider]
   if (!oauthCredentials) {
     return undefined
   }
 
   const endpointResponse = await fetch(oauthCredentials.configEndpoint)
   if (!endpointResponse.ok) {
-    console.log(await endpointResponse.json())
     return undefined
   }
   const endpointObject = (await endpointResponse.json()) as {
     [key: string]: string
   }
-  console.log(endpointObject)
   return endpointObject[endpoint]
 }
 
 export const generateCodeChallenge = (codeVerifier: string) => {
   return base64url(crypto.createHash('sha256').update(codeVerifier).digest())
-}
-
-const getProviderCredentials = (provider: string) => {
-  if (provider === 'google') {
-    return config.google
-  }
-
-  if (provider === 'microsoft') {
-    return config.microsoft
-  }
-
-  return undefined
 }

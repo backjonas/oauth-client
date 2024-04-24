@@ -21,11 +21,13 @@ const processEnvSchema = z.object({
 })
 const typedProcessEnv = processEnvSchema.parse(process.env)
 
-export const config = {
-  port: typedProcessEnv.PORT,
-  frontendOrigin: typedProcessEnv.FRONTEND_ORIGIN,
-  redirectUri: typedProcessEnv.REDIRECT_URI,
-  cookieSecret: typedProcessEnv.COOKIE_SECRET,
+const providers: {
+  [key: string]: {
+    clientId: string
+    clientSecret: string
+    configEndpoint: string
+  }
+} = {
   google: {
     clientId: typedProcessEnv.GOOGLE_OAUTH_CLIENT_ID,
     clientSecret: typedProcessEnv.GOOGLE_OAUTH_CLIENT_SECRET,
@@ -36,4 +38,11 @@ export const config = {
     clientSecret: typedProcessEnv.MICROSOFT_OAUTH_CLIENT_SECRET,
     configEndpoint: typedProcessEnv.MICROSOFT_OID_CONFIG_ENDPOINT,
   },
+}
+export const config = {
+  port: typedProcessEnv.PORT,
+  frontendOrigin: typedProcessEnv.FRONTEND_ORIGIN,
+  redirectUri: typedProcessEnv.REDIRECT_URI,
+  cookieSecret: typedProcessEnv.COOKIE_SECRET,
+  providers,
 }
