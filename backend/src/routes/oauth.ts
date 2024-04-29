@@ -17,7 +17,7 @@ const oauthRouter = express.Router()
 
 oauthRouter.get('/login/:provider', async (req: Request, res: Response) => {
   const { provider } = req.params
-  const state = randomBytes(20).toString('hex')
+  const state = randomBytes(32).toString('hex')
   const codeVerifier = base64url(randomBytes(32))
   const codeChallenge = generateCodeChallenge(codeVerifier)
 
