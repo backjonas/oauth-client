@@ -132,15 +132,17 @@ oauthRouter.get('/sub', async (req: Request, res: Response) => {
   // Access token or provider not provided, ignore request
   const accessToken = req.signedCookies['access_token']
   const provider = req.signedCookies?.provider
-  if (typeof accessToken !== 'string' || typeof provider !== 'string') {
+  if (typeof provider !== 'string') {
     return res.sendStatus(200)
   }
 
-  // Call userinfo endpoint to get information about the token
-  const introspectionResponse = await introspectToken(accessToken, provider)
-  if (introspectionResponse !== undefined) {
-    const sub = introspectionResponse.sub
-    return res.status(200).json({ sub, provider })
+  //Access token exists and should not be expired, attempt to introspect the token
+  if (typeof accessToken === 'string') {
+    const introspectionResponse = await introspectToken(accessToken, provider)
+    if (introspectionResponse !== undefined) {
+      const sub = introspectionResponse.sub
+      return res.status(200).json({ sub, provider })
+    }
   }
 
   // Introspection failed due to an expired or otherwise invalid access token
