@@ -46,11 +46,13 @@ export const getAuthServer = async (
     return undefined
   }
 
+  const scope = provider === 'microsoft' ? 'offline_access openid' : 'openid'
+
   return (
     endpoint +
     '?response_type=code' +
     `&client_id=${oauthCredentials.clientId}` +
-    '&scope=openid' +
+    `&scope=${scope}` +
     `&redirect_uri=${config.redirectUri}/${provider}` +
     '&access_type=offline' +
     `&state=${state}` +
